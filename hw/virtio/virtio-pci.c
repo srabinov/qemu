@@ -2200,6 +2200,57 @@ static const TypeInfo virtio_balloon_pci_info = {
     .class_init    = virtio_balloon_pci_class_init,
 };
 
+/* virtio-test-pci */
+
+static Property virtio_test_pci_pci_properties[] = {
+    DEFINE_PROP_UINT32("class", VirtIOPCIProxy, class_code, 0),
+    DEFINE_PROP_END_OF_LIST(),
+};
+
+static void virtio_test_pci_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
+{
+    VirtIOTestPCIPCI *dev = VIRTIO_TEST_PCI_PCI(vpci_dev);
+    DeviceState *vdev = DEVICE(&dev->vdev);
+
+    if (vpci_dev->class_code != PCI_CLASS_OTHERS &&
+        vpci_dev->class_code != PCI_CLASS_MEMORY_RAM) { /* qemu < 1.1 */
+        vpci_dev->class_code = PCI_CLASS_OTHERS;
+    }
+
+    qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus));
+    object_property_set_bool(OBJECT(vdev), true, "realized", errp);
+}
+
+static void virtio_test_pci_pci_class_init(ObjectClass *klass, void *data)
+{
+    DeviceClass *dc = DEVICE_CLASS(klass);
+    VirtioPCIClass *k = VIRTIO_PCI_CLASS(klass);
+    PCIDeviceClass *pcidev_k = PCI_DEVICE_CLASS(klass);
+    k->realize = virtio_test_pci_pci_realize;
+    set_bit(DEVICE_CATEGORY_MISC, dc->categories);
+    dc->props = virtio_test_pci_pci_properties;
+    pcidev_k->vendor_id = PCI_VENDOR_ID_REDHAT_QUMRANET;
+    pcidev_k->device_id = PCI_DEVICE_ID_VIRTIO_TEST_PCI;
+    pcidev_k->revision = VIRTIO_PCI_ABI_VERSION;
+    pcidev_k->class_id = PCI_BASE_CLASS_NETWORK;
+}
+
+static void virtio_test_pci_pci_instance_init(Object *obj)
+{
+    VirtIOTestPCIPCI *dev = VIRTIO_TEST_PCI_PCI(obj);
+
+    virtio_instance_init_common(obj, &dev->vdev, sizeof(dev->vdev),
+                                TYPE_VIRTIO_TEST_PCI);
+}
+
+static const TypeInfo virtio_test_pci_pci_info = {
+    .name          = TYPE_VIRTIO_TEST_PCI_PCI,
+    .parent        = TYPE_VIRTIO_PCI,
+    .instance_size = sizeof(VirtIOTestPCIPCI),
+    .instance_init = virtio_test_pci_pci_instance_init,
+    .class_init    = virtio_test_pci_pci_class_init,
+};
+
 /* virtio-serial-pci */
 
 static void virtio_serial_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
@@ -2568,6 +2619,7 @@ static void virtio_pci_register_types(void)
     type_register_static(&virtio_blk_pci_info);
     type_register_static(&virtio_scsi_pci_info);
     type_register_static(&virtio_balloon_pci_info);
+    type_register_static(&virtio_test_pci_pci_info);
     type_register_static(&virtio_serial_pci_info);
     type_register_static(&virtio_net_pci_info);
 #ifdef CONFIG_VHOST_SCSI
